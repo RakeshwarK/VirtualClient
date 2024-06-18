@@ -6,6 +6,7 @@ namespace VirtualClient.Dependencies
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Net;
     using System.Security.Cryptography;
     using System.Text;
     using System.Threading;
@@ -178,7 +179,9 @@ namespace VirtualClient.Dependencies
 
         private async Task ConfigurePostgreSQLServerAsync(EventContext telemetryContext, CancellationToken cancellationToken)
         {
-            string arguments = $"{this.packageDirectory}/configure-server.py --dbName {this.DatabaseName} --password {this.SuperUserPassword} --port {this.Port} --sharedMemoryBuffer {this.SharedMemoryBuffer}";
+            string serverIp = this.GetServerIpAddress();
+
+            string arguments = $"{this.packageDirectory}/configure-server.py --dbName {this.DatabaseName} --password {this.SuperUserPassword} --port {this.Port} --sharedMemoryBuffer {this.SharedMemoryBuffer} --serverIp {serverIp}";
 
             using (IProcessProxy process = await this.ExecuteCommandAsync(
                "python3",
@@ -245,14 +248,25 @@ namespace VirtualClient.Dependencies
 
                 foreach (Disk disk in disksToTest)
                 {
-                    if (disk.GetPreferredAccessPath(this.Platform) != "/mnt")
-                    {
-                        diskPaths += $"{disk.GetPreferredAccessPath(this.Platform)};";
-                    }
+                    diskPaths += $"{disk.GetPreferredAccessPath(this.Platform)};";
                 }
             }
 
             return diskPaths;
+        }
+
+        private string GetServerIpAddress()
+        {
+            string serverIPAddress = IPAddress.Loopback.ToString();
+
+            if (this.IsMultiRoleLayout())
+            {
+                ClientInstance serverInstance = this.GetLayoutClientInstances(ClientRole.Server).First();
+                IPAddress.TryParse(serverInstance.IPAddress, out IPAddress serverIP);
+                serverIPAddress = serverIP.ToString();
+            }
+
+            return serverIPAddress;
         }
 
         /// <summary>
