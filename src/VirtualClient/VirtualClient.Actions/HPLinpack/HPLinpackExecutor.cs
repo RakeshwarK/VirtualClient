@@ -5,6 +5,7 @@ namespace VirtualClient.Actions
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO.Abstractions;
     using System.Runtime.InteropServices;
     using System.Threading;
@@ -179,8 +180,8 @@ namespace VirtualClient.Actions
         protected override async Task InitializeAsync(EventContext telemetryContext, CancellationToken cancellationToken)
         {
             await this.EvaluateParametersAsync(cancellationToken);
-            this.ThrowIfPlatformIsNotSupported();
-            await this.CheckDistroSupportAsync(telemetryContext, cancellationToken);
+            // this.ThrowIfPlatformIsNotSupported();
+            // await this.CheckDistroSupportAsync(telemetryContext, cancellationToken);
             this.coreCount = this.cpuInfo.LogicalProcessorCount;
 
             MemoryInfo memoryInfo = await this.systemManagement.GetMemoryInfoAsync(CancellationToken.None);
@@ -192,13 +193,16 @@ namespace VirtualClient.Actions
 
             this.HPLDirectory = workloadPackage.Path;
 
-            await this.ConfigurePerformanceLibrary(telemetryContext, cancellationToken);
-            await this.DeleteFileAsync(this.PlatformSpecifics.Combine(this.HPLDirectory, this.makeFileName));
-            await this.DeleteFileAsync(this.PlatformSpecifics.Combine(this.HPLDirectory, "setup", this.makeFileName));
+            if (this.PerformanceLibrary != "AMD")
+            {
+                await this.ConfigurePerformanceLibrary(telemetryContext, cancellationToken);
+                await this.DeleteFileAsync(this.PlatformSpecifics.Combine(this.HPLDirectory, this.makeFileName));
+                await this.DeleteFileAsync(this.PlatformSpecifics.Combine(this.HPLDirectory, "setup", this.makeFileName));
 
-            await this.ExecuteCommandAsync("bash", "-c \"source make_generic\"", this.PlatformSpecifics.Combine(this.HPLDirectory, $"setup"), telemetryContext, cancellationToken, runElevated: true);
-            await this.ConfigureMakeFileAsync(telemetryContext, cancellationToken);
-            await this.ExecuteCommandAsync("ln", $"-s {this.PlatformSpecifics.Combine(this.HPLDirectory, $"setup", this.makeFileName)} {this.makeFileName}", this.HPLDirectory, telemetryContext, cancellationToken);
+                await this.ExecuteCommandAsync("bash", "-c \"source make_generic\"", this.PlatformSpecifics.Combine(this.HPLDirectory, $"setup"), telemetryContext, cancellationToken, runElevated: true);
+                await this.ConfigureMakeFileAsync(telemetryContext, cancellationToken);
+                await this.ExecuteCommandAsync("ln", $"-s {this.PlatformSpecifics.Combine(this.HPLDirectory, $"setup", this.makeFileName)} {this.makeFileName}", this.HPLDirectory, telemetryContext, cancellationToken);
+            }
 
         }
 
@@ -210,42 +214,57 @@ namespace VirtualClient.Actions
             using (BackgroundOperations profiling = BackgroundOperations.BeginProfiling(this, cancellationToken))
             {
                 DateTime startTime = DateTime.UtcNow;
-                await this.ExecuteCommandAsync("make", $"arch=Linux_GCC", this.HPLDirectory, telemetryContext, cancellationToken)
-                    .ConfigureAwait(false);
 
-                this.SetParameters();
-                await this.ConfigureDatFileAsync(telemetryContext, cancellationToken).ConfigureAwait(false);
-
-                IProcessProxy process;
-
-                if (this.cpuInfo.IsHyperthreadingEnabled)
+                if (this.PerformanceLibrary != "AMD")
                 {
-                    this.commandArguments = $"--use-hwthread-cpus -np {this.NumberOfProcesses} --allow-run-as-root";
+                    await this.ExecuteCommandAsync("make", $"arch=Linux_GCC", this.HPLDirectory, telemetryContext, cancellationToken)
+                 .ConfigureAwait(false);
+
+                    this.SetParameters();
+                    await this.ConfigureDatFileAsync(telemetryContext, cancellationToken).ConfigureAwait(false);
+
+                    IProcessProxy process;
+
+                    if (this.cpuInfo.IsHyperthreadingEnabled)
+                    {
+                        this.commandArguments = $"--use-hwthread-cpus -np {this.NumberOfProcesses} --allow-run-as-root";
+                    }
+                    else
+                    {
+                        this.commandArguments = $"-np {this.NumberOfProcesses} --allow-run-as-root";
+                    }
+
+                    if (this.BindToCores)
+                    {
+                        this.commandArguments += $" --bind-to core";
+                    }
+
+                    process = await this.ExecuteCommandAsync("runuser", $"-u {Environment.UserName} -- mpirun {this.commandArguments} ./xhpl", this.PlatformSpecifics.Combine(this.HPLDirectory, "bin", "Linux_GCC"), telemetryContext, cancellationToken, runElevated: true);
+
+                    using (process)
+                    {
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            await this.LogProcessDetailsAsync(process, telemetryContext, "HPLinpack", logToFile: true)
+                                .ConfigureAwait();
+
+                            process.ThrowIfErrored<WorkloadException>(errorReason: ErrorReason.WorkloadFailed);
+                            this.CaptureMetrics(process.StandardOutput.ToString(), $"runuser {this.commandArguments}", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
+
+                        }
+                    }
                 }
                 else
                 {
-                    this.commandArguments = $"-np {this.NumberOfProcesses} --allow-run-as-root";
+                    DependencyPath performanceLibrariesPackage = await this.packageManager.GetPackageAsync(this.PerformanceLibrariesPackageName, cancellationToken)
+                                                                        .ConfigureAwait(false);
+                    string armperfLibrariesPath = this.PlatformSpecifics.Combine(performanceLibrariesPackage.Path, "AMD");
+                   // await this.systemManagement.MakeFileExecutableAsync(this.PlatformSpecifics.Combine(armperfLibrariesPath, $"{this.hplPerfLibraryInfo}.sh"), this.Platform, cancellationToken).ConfigureAwait(false);
+                    var processDetails = await this.ExecuteCommandAsync($"./run.sh", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: false);
+                    this.CaptureMetrics(processDetails.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
+
                 }
-
-                if (this.BindToCores)
-                {
-                    this.commandArguments += $" --bind-to core";
-                }
-
-                process = await this.ExecuteCommandAsync("runuser", $"-u {Environment.UserName} -- mpirun {this.commandArguments} ./xhpl", this.PlatformSpecifics.Combine(this.HPLDirectory, "bin", "Linux_GCC"), telemetryContext, cancellationToken, runElevated: true);
-
-                using (process)
-                {
-                    if (!cancellationToken.IsCancellationRequested)
-                    {
-                        await this.LogProcessDetailsAsync(process, telemetryContext, "HPLinpack", logToFile: true)
-                            .ConfigureAwait();
-
-                        process.ThrowIfErrored<WorkloadException>(errorReason: ErrorReason.WorkloadFailed);
-                        this.CaptureMetrics(process.StandardOutput.ToString(), $"runuser {this.commandArguments}", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
-
-                    }
-                }
+                 
             }
         }
 
