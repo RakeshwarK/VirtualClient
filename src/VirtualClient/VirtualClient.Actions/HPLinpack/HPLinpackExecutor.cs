@@ -265,6 +265,9 @@ namespace VirtualClient.Actions
                     string username = this.GetLoggedInUserName();
                     Console.WriteLine($"Username: {username}");
                     var processDetails = await this.ExecuteCommandAsync("./run.sh", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: true, username: username);
+                    Console.WriteLine($"Output: {processDetails.StandardOutput}");
+                    Console.WriteLine($"Error: {processDetails.StandardError}");
+                    Console.WriteLine($"ExitCode: {processDetails.ExitCode}");
                     this.CaptureMetrics(processDetails.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
 
                 }
