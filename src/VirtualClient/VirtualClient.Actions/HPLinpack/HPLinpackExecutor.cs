@@ -262,12 +262,19 @@ namespace VirtualClient.Actions
                     await this.systemManagement.MakeFileExecutableAsync(this.PlatformSpecifics.Combine(armperfLibrariesPath, $"run.sh"), this.Platform, cancellationToken).ConfigureAwait(false);
                     await this.systemManagement.MakeFileExecutableAsync(this.PlatformSpecifics.Combine(armperfLibrariesPath, $"xhpl"), this.Platform, cancellationToken).ConfigureAwait(false);
                     // var username = this.HPLDirectory.Split("/")[2];
-                    var processDetails = await this.ExecuteCommandAsync("runuser", $"-u {Environment.UserName} ./run.sh", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: true);
+                    string username = this.GetLoggedInUserName();
+                    Console.WriteLine($"Username: {username}");
+                    var processDetails = await this.ExecuteCommandAsync("./run.sh", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: true, username: username);
                     this.CaptureMetrics(processDetails.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
 
                 }
                  
             }
+        }
+
+        private string GetLoggedInUserName()
+        {
+            return this.systemManagement.GetLoggedInUserName();
         }
 
         private void SetParameters()
