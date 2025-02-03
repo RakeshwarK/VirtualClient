@@ -263,12 +263,15 @@ namespace VirtualClient.Actions
                     await this.systemManagement.MakeFileExecutableAsync(this.PlatformSpecifics.Combine(armperfLibrariesPath, $"xhpl"), this.Platform, cancellationToken).ConfigureAwait(false);
                     // var username = this.HPLDirectory.Split("/")[2];
                     string username = this.GetLoggedInUserName();
-                    Console.WriteLine($"Username: {username}");
-                    var processDetails = await this.ExecuteCommandAsync("./run.sh", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: true, username: username);
-                    Console.WriteLine($"Output: {processDetails.StandardOutput}");
-                    Console.WriteLine($"Error: {processDetails.StandardError}");
-                    Console.WriteLine($"ExitCode: {processDetails.ExitCode}");
-                    this.CaptureMetrics(processDetails.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
+                   // Console.WriteLine($"Username: {username}");
+                    var process0 = await this.ExecuteCommandAsync("./run.sh", "-c", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: true, username: username);
+                   // Console.WriteLine($"Output: {process0.StandardOutput}");
+                   // Console.WriteLine($"Error: {process0.StandardError}");
+                    var process1 = await this.ExecuteCommandAsync("./run.sh", armperfLibrariesPath, telemetryContext, cancellationToken, runElevated: true, username: username);
+                   // Console.WriteLine($"Output: {process1.StandardOutput}");
+                   // Console.WriteLine($"Error: {process1.StandardError}");
+                   // Console.WriteLine($"ExitCode: {process1.ExitCode}");
+                    this.CaptureMetrics(process1.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
 
                 }
                  
