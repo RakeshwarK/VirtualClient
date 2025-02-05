@@ -49,6 +49,28 @@ namespace VirtualClient.Actions
         }
 
         [Test]
+        public void HPLParserVerifyAMDResults()
+        {
+            string workingDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string outputPath = Path.Combine(workingDirectory, "Examples", "HPLinpack", "HPL-AMDResults.txt");
+            this.rawText = File.ReadAllText(outputPath);
+            this.testParser = new HPLinpackMetricsParser(this.rawText, isAMD: true);
+
+            IList<Metric> metrics = this.testParser.Parse();
+            Assert.AreEqual(4, metrics.Count);
+            Assert.IsTrue(metrics[0].Metadata.ContainsKey("N_WR01R2R4"));
+            Assert.IsTrue(metrics[0].Metadata["N_WR01R2R4"].Equals("86880"));
+            Assert.IsTrue(metrics[0].Metadata.ContainsKey("NB_WR01R2R4"));
+            Assert.IsTrue(metrics[0].Metadata["NB_WR01R2R4"].Equals("240"));
+            Assert.IsTrue(metrics[0].Metadata.ContainsKey("P_WR01R2R4"));
+            Assert.IsTrue(metrics[0].Metadata["P_WR01R2R4"].Equals("1"));
+            Assert.IsTrue(metrics[0].Metadata.ContainsKey("Q_WR01R2R4"));
+            Assert.IsTrue(metrics[0].Metadata["Q_WR01R2R4"].Equals("1"));
+            MetricAssert.Exists(metrics, "Time", 1206.03);
+            MetricAssert.Exists(metrics, "GFlops", 362.51);
+        }
+
+        [Test]
         public void HPLParserThrowIfInvalidOutput()
         {
             string workingDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);

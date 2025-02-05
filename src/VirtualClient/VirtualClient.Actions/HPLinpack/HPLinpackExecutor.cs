@@ -271,7 +271,7 @@ namespace VirtualClient.Actions
                    // Console.WriteLine($"Output: {process1.StandardOutput}");
                    // Console.WriteLine($"Error: {process1.StandardError}");
                    // Console.WriteLine($"ExitCode: {process1.ExitCode}");
-                    this.CaptureMetrics(process1.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken);
+                    this.CaptureMetrics(process1.StandardOutput.ToString(), $"./run.sh", startTime, DateTime.UtcNow, telemetryContext, cancellationToken, isAMD: true);
 
                 }
                  
@@ -505,7 +505,7 @@ namespace VirtualClient.Actions
             }
         }
 
-        private void CaptureMetrics(string results, string commandArguments, DateTime startTime, DateTime endTime, EventContext telemetryContext, CancellationToken cancellationToken)
+        private void CaptureMetrics(string results, string commandArguments, DateTime startTime, DateTime endTime, EventContext telemetryContext, CancellationToken cancellationToken, bool isAMD = false)
         {
             var additionalMetadata = new Dictionary<string, object>();
             additionalMetadata[$"{nameof(this.PerformanceLibrary)}"] = this.PerformanceLibrary;
@@ -518,7 +518,7 @@ namespace VirtualClient.Actions
 
             this.MetadataContract.Apply(telemetryContext);
 
-            HPLinpackMetricsParser parser = new HPLinpackMetricsParser(results);
+            HPLinpackMetricsParser parser = new HPLinpackMetricsParser(results, isAMD);
             IList<Metric> metrics = parser.Parse();
 
             foreach (Metric result in metrics)
