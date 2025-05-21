@@ -85,7 +85,7 @@ This profile is designed to identify general/broad regressions when compared aga
   | Platform                 | PerformanceLibrary          |        PerformanceLibraryVersion              |  CompilerName   |  CompilerVersion  |  Commandline Usage  |
   |--------------------------|-----------------------------|-----------------------------------------------|------------|------------|
   |   arm64 | ARM | 23.04.1, 24.10 and 25.04.1 | gcc | 11 |  --parameters=PerformanceLibrary=ARM,,,PerformanceLibraryVersion=23.04.10,,,CompilerName=gcc,,,CompilerVersion=11 |
-  |   x64 | AMD  | 4.2.0 | gcc | 11 |   --parameters=PerformanceLibrary=AMD,,,PerformanceLibraryVersion=4.2.0,,,CompilerName=gcc,,,CompilerVersion=11 |
+  |   x64 | AMD  | 4.2.0, 5.0.0 and 5.1.0 | gcc | 11 |   --parameters=PerformanceLibrary=AMD,,,PerformanceLibraryVersion=4.2.0,,,CompilerName=gcc,,,CompilerVersion=13 |
 
 * **Resources**
 
