@@ -524,7 +524,7 @@ namespace VirtualClient.Actions
                     result.Value,
                     result.Unit,
                     null,
-                    $"[ -N {this.ProblemSizeN} -NB {this.BlockSizeNB} -P {this.ProcessRows} -Q {this.ProcessColumns} {this.commandArguments} --perfLibrary={this.hplArmPerfLibraryInfo} ]",  //
+                    $"[ -N {this.ProblemSizeN} -NB {this.BlockSizeNB} -P {this.ProcessRows} -Q {this.ProcessColumns} {this.commandArguments} --perfLibrary={this.PerformanceLibrary} --perfLibraryVersion={this.PerformanceLibraryVersion} ]",
                     this.Tags,
                     telemetryContext,
                     result.Relativity,
