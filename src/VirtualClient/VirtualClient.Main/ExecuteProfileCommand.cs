@@ -3,8 +3,15 @@
 
 namespace VirtualClient
 {
+    using Azure.Storage.Blobs;
+    using Microsoft.CodeAnalysis;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging;
+    using Newtonsoft.Json;
+    using Polly;
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Globalization;
     using System.IO;
     using System.IO.Abstractions;
@@ -15,12 +22,6 @@ namespace VirtualClient
     using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
-    using Azure.Storage.Blobs;
-    using Microsoft.CodeAnalysis;
-    using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.Logging;
-    using Newtonsoft.Json;
-    using Polly;
     using VirtualClient.Common;
     using VirtualClient.Common.Contracts;
     using VirtualClient.Common.Extensions;
@@ -382,7 +383,7 @@ namespace VirtualClient
             ExecutionProfile profile = await this.ReadExecutionProfileAsync(profiles.First(), dependencies, cancellationToken)
                 .ConfigureAwait(false);
 
-            this.InitializeProfile(profile);
+            await this.InitializeProfileAsync(profile, dependencies);
 
             if (profiles.Count() > 1)
             {
@@ -391,7 +392,7 @@ namespace VirtualClient
                     ExecutionProfile otherProfile = await this.ReadExecutionProfileAsync(additionalProfile, dependencies, cancellationToken)
                         .ConfigureAwait(false);
 
-                    this.InitializeProfile(otherProfile);
+                    await this.InitializeProfileAsync(otherProfile, dependencies);
                     profile = profile.MergeWith(otherProfile);
                 }
             }
@@ -405,7 +406,7 @@ namespace VirtualClient
                 ExecutionProfile fileUploadMonitorProfile = await this.ReadExecutionProfileAsync(fileUploadMonitorProfilePath, dependencies, cancellationToken)
                     .ConfigureAwait(false);
 
-                this.InitializeProfile(fileUploadMonitorProfile);
+                await this.InitializeProfileAsync(fileUploadMonitorProfile, dependencies);
                 profile = profile.MergeWith(fileUploadMonitorProfile);
             }
 
@@ -808,7 +809,7 @@ namespace VirtualClient
             }
         }
 
-        private void InitializeProfile(ExecutionProfile profile)
+        private async Task InitializeProfileAsync(ExecutionProfile profile, IServiceCollection dependencies)
         {
             if (this.Metadata?.Any() == true)
             {
@@ -825,6 +826,13 @@ namespace VirtualClient
 
             ValidationResult result = ExecutionProfileValidation.Instance.Validate(profile);
             result.ThrowIfInvalid();
+
+            if (dependencies.TryGetService<IExpressionEvaluator>(out IExpressionEvaluator evaluator))
+            {
+                await evaluator.EvaluateAsync(dependencies, profile.Parameters);
+            }
+
+            // TODO: Impement the ParametersOn feature.
             profile.Inline();
         }
 
