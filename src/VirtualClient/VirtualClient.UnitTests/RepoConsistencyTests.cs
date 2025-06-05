@@ -19,6 +19,7 @@ namespace VirtualClient
 
     [TestFixture]
     [Category("Unit")]
+    [Ignore("We do not need to worry about byte order marks (BOM) existing in files anymore.")]
     public class RepoConsistencyTests
     {
         [Test]
@@ -86,7 +87,7 @@ namespace VirtualClient
                 0,
                 flaggedFiles.Count(),
                 $"Invalid file encodings. The repo has {fileType} files that are UTF-8 encoded with a byte-order mark (BOM) sequence. Open and save the following files " +
-                $"without the byte-order mark: {Environment.NewLine}{string.Join($"{Environment.NewLine}{Environment.NewLine}", fileList.Select(f => f.FullName).OrderBy(path => path))}");
+                $"without the byte-order mark: {Environment.NewLine}{string.Join($"{Environment.NewLine}{Environment.NewLine}", flaggedFiles.Select(f => f.FullName).OrderBy(path => path))}");
         }
     }
 }

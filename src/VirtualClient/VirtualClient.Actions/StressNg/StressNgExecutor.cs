@@ -51,6 +51,17 @@ namespace VirtualClient.Actions
         }
 
         /// <summary>
+        /// The Cool down period for Virtual Client Component.
+        /// </summary>
+        public TimeSpan CoolDownPeriod
+        {
+            get
+            {
+                return this.Parameters.GetTimeSpanValue(nameof(this.CoolDownPeriod), TimeSpan.FromSeconds(0));
+            }
+        }
+        
+        /// <summary>
         /// The command line argument defined in the profile.
         /// </summary>
         public string CommandLine
@@ -84,6 +95,9 @@ namespace VirtualClient.Actions
                     }
                 }
             }
+
+            // TO DO: Remove once we have Loop Executor.
+            await this.WaitAsync(this.CoolDownPeriod, cancellationToken);
         }
 
         /// <summary>
@@ -165,25 +179,25 @@ namespace VirtualClient.Actions
 
         private string GetCommandLineArguments()
         {
-            string commandLineArgs = this.CommandLine;
+            string commandLineArgs = string.Empty;
 
-            if (!commandLineArgs.Contains("--cpu ") && !commandLineArgs.Contains("-c "))
+            if (!this.CommandLine.Contains("--cpu ") && !this.CommandLine.Contains("-c "))
             {
                 commandLineArgs += $" --cpu {Environment.ProcessorCount}";
             }
 
-            if (!commandLineArgs.Contains("--timeout") && !commandLineArgs.Contains("-t "))
+            if (!this.CommandLine.Contains("--timeout") && !this.CommandLine.Contains("-t "))
             {
                 commandLineArgs += $" --timeout {DefaultRuntimeInSeconds}";
             }
 
-            if (!commandLineArgs.Contains("--metrics"))
+            if (!this.CommandLine.Contains("--metrics"))
             {
                 commandLineArgs += $" --metrics";
             }
 
             commandLineArgs += $" --yaml {this.stressNgOutputFilePath}";
-
+            commandLineArgs += $" {this.CommandLine}";
             // Example: stress-ng --cpu 16 --timeout 60 --metrics --yaml vcStressNg.yaml
             return commandLineArgs.Trim();
         }
