@@ -162,7 +162,7 @@ namespace VirtualClient
                 .Setup(file => file.ReadAllTextAsync(It.Is<string>(file => file.EndsWith(defaultMonitorProfile)), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(File.ReadAllText(this.mockFixture.Combine(ExecuteProfileCommandTests.ProfilesDirectory, defaultMonitorProfile)));
 
-            ExecutionProfile profile = await this.command.InitializeProfilesAsync(profiles,this.mockFixture.Dependencies, CancellationToken.None)
+            ExecutionProfile profile = await this.command.InitializeProfilesAsync(profiles, this.mockFixture.Dependencies, CancellationToken.None)
                 .ConfigureAwait(false);
 
             Assert.AreEqual(2, profile.Actions.Count);
@@ -202,7 +202,7 @@ namespace VirtualClient
 
             bool isCommandMetadataSubset = this.command.Metadata.All(kvp =>
             profile.Metadata.TryGetValue(kvp.Key, out var value) && value.Equals(kvp.Value));
-            
+
             Assert.IsTrue(isCommandMetadataSubset);
         }
 
@@ -236,6 +236,33 @@ namespace VirtualClient
             profile.Parameters.TryGetValue(kvp.Key, out var value) && value.Equals(kvp.Value));
 
             Assert.IsTrue(isCommandParametersSubset);
+        }
+
+        [Test]
+        public async Task RunProfileTestCalculateTheExpectedParametersInProfile()
+        {
+            // Scenario:
+            // In the default scenario, a workload profile is supplied that only contains
+            // workloads (i.e. no specific monitors).
+            string profile1 = "TEST-WORKLOAD-PROFILE-3.json";
+            List<string> profiles = new List<string> { this.mockFixture.GetProfilesPath(profile1) };
+            this.command.Parameters = new Dictionary<string, IConvertible>();
+
+            // Setup:
+            // Read the actual profile content from the local file system.
+            this.mockFixture.File
+                .Setup(file => file.ReadAllTextAsync(It.Is<string>(file => file.EndsWith(profile1)), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(File.ReadAllText(this.mockFixture.Combine(ExecuteProfileCommandTests.ProfilesDirectory, profile1)));
+
+            ExecutionProfile profile = await this.command.InitializeProfilesAsync(profiles, this.mockFixture.Dependencies, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            Assert.AreEqual(2, profile.Actions.Count);
+            Assert.AreEqual(1, profile.Dependencies.Count);
+            Assert.AreEqual(0, profile.Monitors.Count);
+            Assert.AreEqual(2, profile.Parameters.Count);
+            Assert.AreEqual("falseflag", profile.Parameters["NewFlag"].ToString());
+            Assert.AreEqual("falseflag", profile.Actions[0].Parameters["NewFlag"].ToString());
         }
 
         [Test]

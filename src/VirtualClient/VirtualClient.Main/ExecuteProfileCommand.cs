@@ -787,7 +787,7 @@ namespace VirtualClient
             {
                 logger.LogMessage($"Duration: {this.Timeout.Duration}", telemetryContext);
             }
-            
+
             this.Validate(dependencies, profile);
 
             using (ProfileExecutor profileExecutor = new ProfileExecutor(profile, dependencies, this.Scenarios, logger))
