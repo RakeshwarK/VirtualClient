@@ -6,6 +6,7 @@ namespace VirtualClient.Actions
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Net;
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
@@ -17,19 +18,32 @@ namespace VirtualClient.Actions
     public class AspNetBenchProfileTests
     {
         private DependencyFixture mockFixture;
+        private string clientAgentId;
+        private string serverAgentId;
 
         [OneTimeSetUp]
         public void SetupFixture()
         {
-            this.mockFixture = new DependencyFixture();
+            this.clientAgentId = $"{Environment.MachineName}-Client";
+            this.serverAgentId = $"{Environment.MachineName}-Server";
+
             ComponentTypeCache.Instance.LoadComponentTypes(TestDependencies.TestDirectory);
+        }
+
+        [SetUp]
+        public void Setup()
+        {
+            this.mockFixture = new DependencyFixture();
         }
 
         [Test]
         [TestCase("PERF-ASPNETBENCH.json")]
         public void AspNetBenchWorkloadProfileParametersAreInlinedCorrectly(string profile)
         {
-            this.mockFixture.Setup(PlatformID.Unix);
+            this.mockFixture.Setup(PlatformID.Unix, agentId: this.clientAgentId).SetupLayout(
+                new ClientInstance(this.clientAgentId, "1.2.3.5", ClientRole.Client),
+                new ClientInstance(this.serverAgentId, "1.2.3.4", ClientRole.Server));
+
             using (ProfileExecutor executor = TestDependencies.CreateProfileExecutor(profile, this.mockFixture.Dependencies))
             {
                 WorkloadAssert.ParameterReferencesInlined(executor.Profile);
@@ -42,10 +56,6 @@ namespace VirtualClient.Actions
         {
             IEnumerable<string> expectedCommands = this.GetProfileExpectedCommands(PlatformID.Win32NT);
             this.SetupDefaultMockBehaviors(PlatformID.Win32NT);
-            // Setup the expectations for the workload
-            // - Workload package is installed and exists.
-            // - Workload binaries/executables exist on the file system.
-            // - The workload generates valid results.
 
             this.mockFixture.ProcessManager.OnCreateProcess = (command, arguments, workingDir) =>
             {
@@ -57,6 +67,9 @@ namespace VirtualClient.Actions
 
                 return process;
             };
+
+            // Setup API client for client-server communication
+            this.SetupApiClient(this.serverAgentId, "1.2.3.4");
 
             using (ProfileExecutor executor = TestDependencies.CreateProfileExecutor(profile, this.mockFixture.Dependencies))
             {
@@ -73,10 +86,6 @@ namespace VirtualClient.Actions
         {
             IEnumerable<string> expectedCommands = this.GetProfileExpectedCommands(PlatformID.Unix);
             this.SetupDefaultMockBehaviors(PlatformID.Unix);
-            // Setup the expectations for the workload
-            // - Workload package is installed and exists.
-            // - Workload binaries/executables exist on the file system.
-            // - The workload generates valid results.
 
             this.mockFixture.ProcessManager.OnCreateProcess = (command, arguments, workingDir) =>
             {
@@ -88,6 +97,9 @@ namespace VirtualClient.Actions
 
                 return process;
             };
+
+            // Setup API client for client-server communication
+            this.SetupApiClient(this.serverAgentId, "1.2.3.4");
 
             using (ProfileExecutor executor = TestDependencies.CreateProfileExecutor(profile, this.mockFixture.Dependencies))
             {
@@ -107,8 +119,10 @@ namespace VirtualClient.Actions
                     commands = new List<string>
                     {
                         @"dotnet\.exe build -c Release -p:BenchmarksTargetFramework=net8.0",
-                        @"dotnet\.exe .+Benchmarks.dll --nonInteractive true --scenarios json --urls http://localhost:9876 --server Kestrel --kestrelTransport Sockets --protocol http --header ""Accept:.+ keep-alive",
-                        @"bombardier\.exe --duration 15s --connections 256 --timeout 10s --fasthttp --insecure -l http://localhost:9876/json --print r --format json"
+                        @"pkill dotnet",
+                        @"fuser -n tcp -k 9876",
+                        @"dotnet\.exe .+Benchmarks.dll --nonInteractive true --scenarios json --urls http://\*:9876 --server Kestrel --kestrelTransport Sockets --protocol http --header ""Accept:.+ keep-alive",
+                        @"bombardier\.exe --duration 15s --connections 256 --timeout 10s --fasthttp --insecure -l http://1\.2\.3\.4:9876/json --print r --format json"
                     };
                     break;
 
@@ -117,8 +131,10 @@ namespace VirtualClient.Actions
                     {
                         @"chmod \+x .+bombardier",
                         @"dotnet build -c Release -p:BenchmarksTargetFramework=net8.0",
-                        @"dotnet .+Benchmarks.dll --nonInteractive true --scenarios json --urls http://localhost:9876 --server Kestrel --kestrelTransport Sockets --protocol http --header ""Accept:.+ keep-alive",
-                        @"bombardier --duration 15s --connections 256 --timeout 10s --fasthttp --insecure -l http://localhost:9876/json --print r --format json"
+                        @"pkill dotnet",
+                        @"fuser -n tcp -k 9876",
+                        @"dotnet .+Benchmarks.dll --nonInteractive true --scenarios json --urls http://\*:9876 --server Kestrel --kestrelTransport Sockets --protocol http --header ""Accept:.+ keep-alive",
+                        @"bombardier --duration 15s --connections 256 --timeout 10s --fasthttp --insecure -l http://1\.2\.3\.4:9876/json --print r --format json"
                     };
                     break;
             }
@@ -130,14 +146,19 @@ namespace VirtualClient.Actions
         {
             if (platform == PlatformID.Win32NT)
             {
-                this.mockFixture.Setup(PlatformID.Win32NT);
+                this.mockFixture.Setup(PlatformID.Win32NT, agentId: this.clientAgentId).SetupLayout(
+                    new ClientInstance(this.clientAgentId, "1.2.3.5", ClientRole.Client),
+                    new ClientInstance(this.serverAgentId, "1.2.3.4", ClientRole.Server));
+
                 this.mockFixture.SetupPackage("aspnetbenchmarks", expectedFiles: @"aspnetbench");
                 this.mockFixture.SetupPackage("bombardier", expectedFiles: @"win-x64\bombardier.exe");
                 this.mockFixture.SetupPackage("dotnetsdk", expectedFiles: @"packages\dotnet\dotnet.exe");
             }
             else
             {
-                this.mockFixture.Setup(PlatformID.Unix);
+                this.mockFixture.Setup(PlatformID.Unix, agentId: this.clientAgentId).SetupLayout(
+                    new ClientInstance(this.clientAgentId, "1.2.3.5", ClientRole.Client),
+                    new ClientInstance(this.serverAgentId, "1.2.3.4", ClientRole.Server));
 
                 this.mockFixture.SetupPackage("aspnetbenchmarks", expectedFiles: @"aspnetbench");
                 this.mockFixture.SetupPackage("bombardier", expectedFiles: @"linux-x64\bombardier");
@@ -145,6 +166,18 @@ namespace VirtualClient.Actions
             }
 
             this.mockFixture.SetupDisks(withRemoteDisks: false);
+        }
+
+        private void SetupApiClient(string serverName, string serverIPAddress)
+        {
+            IPAddress.TryParse(serverIPAddress, out IPAddress ipAddress);
+            IApiClient apiClient = this.mockFixture.ApiClientManager.GetOrCreateApiClient(serverName, ipAddress);
+
+            State state = new State();
+            state.Online(true);
+
+            apiClient.CreateStateAsync(nameof(State), state, CancellationToken.None)
+                .GetAwaiter().GetResult();
         }
     }
 }
